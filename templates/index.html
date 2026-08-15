@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EAuto - Email Automation Scheduler</title>
+    <!-- Custom CSS -->
+    <link href="{{ url_for('static', filename='css/styles.css') }}?v=1" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- SheetJS for Excel parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- Jspreadsheet CE CSS -->
+    <link rel="stylesheet" href="https://bossanova.uk/jspreadsheet/v4/jexcel.css" type="text/css" />
+    <link rel="stylesheet" href="https://jsuites.net/v4/jsuites.css" type="text/css" />
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar / Navigation -->
+        <nav class="sidebar">
+            <div class="logo">
+                <i class="fas fa-envelope-open-text"></i>
+                <h2>EAuto</h2>
+            </div>
+            <ul class="nav-links">
+                <li class="active"><a href="#"><i class="fas fa-home"></i> Dashboard</a></li>
+                <li><a href="#logs"><i class="fas fa-list-ul"></i> Logs</a></li>
+                <li><a href="#settings"><i class="fas fa-cog"></i> Settings</a></li>
+            </ul>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header>
+                <div class="header-title">
+                    <h1>Dashboard</h1>
+                    <p>Manage and monitor your automated email messages</p>
+                </div>
+                <div class="header-controls">
+                    <div id="scheduler-status-indicator" class="status-indicator offline">
+                        <span class="dot"></span>
+                        <span class="text" id="scheduler-status-text">Scheduler Offline</span>
+                    </div>
+                    <button id="btn-start" class="btn btn-primary" onclick="controlScheduler('start')"><i class="fas fa-play"></i> Start Scheduler</button>
+                    <button id="btn-stop" class="btn btn-danger" onclick="controlScheduler('stop')"><i class="fas fa-stop"></i> Stop Scheduler</button>
+                </div>
+            </header>
+
+            <div id="toast-container"></div>
+
+            <!-- Stats Cards -->
+            <section class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon bg-blue"><i class="fas fa-mail-bulk"></i></div>
+                    <div class="stat-info">
+                        <h3>Total</h3>
+                        <p id="stat-total">0</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon bg-yellow"><i class="fas fa-clock"></i></div>
+                    <div class="stat-info">
+                        <h3>Pending</h3>
+                        <p id="stat-pending">0</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon bg-green"><i class="fas fa-check-circle"></i></div>
+                    <div class="stat-info">
+                        <h3>Sent</h3>
+                        <p id="stat-sent">0</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon bg-red"><i class="fas fa-exclamation-circle"></i></div>
+                    <div class="stat-info">
+                        <h3>Failed</h3>
+                        <p id="stat-failed">0</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Data Entry Section -->
+            <section class="data-entry glass-panel">
+                <div class="panel-header">
+                    <h2><i class="fas fa-file-excel"></i> Bulk Import & Schedule</h2>
+                    <p>Enter data or copy-paste from Excel. Format: Email [Tab] Subject [Tab] Message [Tab] Time (YYYY-MM-DD HH:MM)</p>
+                </div>
+                
+                <div class="input-area">
+                    <div id="spreadsheet"></div>
+                </div>
+                
+                <div class="actions">
+                    <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" style="display: none;">
+                    <button id="btn-upload-excel" class="btn btn-primary"><i class="fas fa-file-upload"></i> Upload Excel / CSV</button>
+                    <button id="btn-save" class="btn btn-secondary"><i class="fas fa-save"></i> Save Draft</button>
+                    <button id="btn-execute" class="btn btn-success"><i class="fas fa-paper-plane"></i> Execute Scheduler</button>
+                    <button id="btn-add-row" class="btn btn-secondary"><i class="fas fa-plus"></i> Add Row</button>
+                    <button id="btn-clear-textarea" class="btn btn-secondary"><i class="fas fa-eraser"></i> Clear</button>
+                </div>
+            </section>
+
+            <!-- Live Tracking Table -->
+            <section class="data-table-section glass-panel" id="logs">
+                <div class="panel-header flex-between">
+                    <h2><i class="fas fa-table"></i> Email Queue</h2>
+                    <div>
+                        <button id="btn-delete-all" class="btn btn-danger"><i class="fas fa-trash-alt"></i> Delete All</button>
+                        <button id="btn-refresh" class="btn btn-icon"><i class="fas fa-sync-alt"></i></button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table id="messages-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Email Address</th>
+                                <th>Subject</th>
+                                <th>Scheduled Time</th>
+                                <th>Sent Time</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tasks-tbody">
+                            <tr>
+                                <td colspan="7" class="text-center text-muted">Loading data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Retry Modal -->
+    <div id="retry-modal" class="modal" style="display: none;">
+        <div class="modal-content glass-panel">
+            <div class="modal-header">
+                <h2>Reschedule Task</h2>
+                <span class="close-modal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>Select a new time to schedule this email:</p>
+                <input type="datetime-local" id="retry-time-input" class="form-control" style="width: 100%; padding: 10px; margin-top: 10px; background: var(--sidebar-bg); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 5px;">
+                <input type="hidden" id="retry-task-id">
+            </div>
+            <div class="modal-footer" style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
+                <button id="btn-cancel-retry" class="btn btn-secondary">Cancel</button>
+                <button id="btn-confirm-retry" class="btn btn-primary">Reschedule & Retry</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://bossanova.uk/jspreadsheet/v4/jexcel.js"></script>
+    <script src="https://jsuites.net/v4/jsuites.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}?v=1"></script>
+</body>
+</html>
