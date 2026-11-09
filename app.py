@@ -32,6 +32,7 @@ def save_data():
 
     saved_tasks = []
     try:
+        from datetime import datetime
         for row in data:
             if not row.get('email_address'):
                 continue # Skip empty rows
@@ -40,7 +41,7 @@ def save_data():
                 email_address=row.get('email_address'),
                 subject=row.get('subject'),
                 message_content=row.get('message_content'),
-                scheduled_time=pd.to_datetime(row.get('scheduled_time')).to_pydatetime(),
+                scheduled_time=datetime.now(),
                 status='Pending'
             )
             db.session.add(task)
@@ -59,12 +60,13 @@ def execute_data():
         return jsonify({'error': 'No data provided'}), 400
 
     try:
+        from datetime import datetime, timedelta
         # Save and schedule
-        for row in data:
+        for i, row in enumerate(data):
             if not row.get('email_address'):
                 continue
                 
-            scheduled_time = pd.to_datetime(row.get('scheduled_time')).to_pydatetime()
+            scheduled_time = datetime.now() + timedelta(seconds=20 * i)
             
             task = EmailTask(
                 email_address=row.get('email_address'),

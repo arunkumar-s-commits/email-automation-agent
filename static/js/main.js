@@ -60,13 +60,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize Jspreadsheet
     let spreadsheet = jspreadsheet(document.getElementById('spreadsheet'), {
         data: [
-            ['', '', '', '']
+            ['', '', '']
         ],
         columns: [
             { type: 'text', title: 'Email Address', width: 250 },
             { type: 'text', title: 'Subject', width: 200 },
-            { type: 'text', title: 'Message Content', width: 350 },
-            { type: 'text', title: 'Scheduled Time (YYYY-MM-DD HH:MM)', width: 250 }
+            { type: 'text', title: 'Message Content', width: 350 }
         ],
         minDimensions: [4, 5],
         contextMenu: true,
@@ -132,7 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     btnClear.addEventListener('click', () => {
-        spreadsheet.setData([['', '', '', '']]);
+        spreadsheet.setData([['', '', '']]);
     });
 
     btnAddRow.addEventListener('click', () => {
@@ -234,13 +233,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     return [
                         row[0] ? row[0].toString().trim() : '',
                         row[1] ? row[1].toString().trim() : '',
-                        row[2] ? row[2].toString().trim() : '',
-                        row[3] ? row[3].toString().trim() : ''
+                        row[2] ? row[2].toString().trim() : ''
                     ];
                 });
                 
                 spreadsheet.setData(mappedData);
-                showToast('File imported successfully! Times preserved.', 'success');
+                showToast('File imported successfully!', 'success');
             } else {
                 showToast(data.error || 'Failed to import file', 'danger');
             }
@@ -259,17 +257,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const email = row[0] ? row[0].trim() : '';
             const subject = row[1] ? row[1].trim() : '';
             const content = row[2] ? row[2].trim() : '';
-            const timeStr = row[3] ? row[3].trim() : '';
 
             // Skip empty rows
-            if (!email && !subject && !content && !timeStr) continue;
+            if (!email && !subject && !content) continue;
 
-            if (email && timeStr) {
+            if (email) {
                 records.push({
                     email_address: email,
                     subject: subject,
-                    message_content: content,
-                    scheduled_time: timeStr.trim()
+                    message_content: content
                 });
             } else {
                 console.warn(`Row ${i+1} is incomplete`);
@@ -281,7 +277,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btnSave.addEventListener('click', async () => {
         const records = getCleanData();
         if (records.length === 0) {
-            alert('No valid data found. Ensure Email and Scheduled Time are filled.');
+            alert('No valid data found. Ensure Email is filled.');
             return;
         }
 
@@ -296,7 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (res.ok) {
-                spreadsheet.setData([['', '', '', '']]);
+                spreadsheet.setData([['', '', '']]);
                 showToast(`Successfully saved draft for ${records.length} emails.`, 'success');
                 fetchTasks();
                 fetchStats();
@@ -316,7 +312,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btnExecute.addEventListener('click', async () => {
         const records = getCleanData();
         if (records.length === 0) {
-            alert('No valid data found. Ensure Email and Scheduled Time are filled.');
+            alert('No valid data found. Ensure Email is filled.');
             return;
         }
 
@@ -331,7 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (res.ok) {
-                spreadsheet.setData([['', '', '', '']]);
+                spreadsheet.setData([['', '', '']]);
                 showToast(`Successfully scheduled ${records.length} emails.`, 'success');
                 fetchTasks();
                 fetchStats();
@@ -428,7 +424,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td>#${task.id}</td>
                     <td>${task.email_address}</td>
                     <td>${task.subject}</td>
-                    <td>${schedDate}</td>
                     <td>${sentDate}</td>
                     <td>
                         <span class="status-badge ${statusClass}">${task.status}</span>

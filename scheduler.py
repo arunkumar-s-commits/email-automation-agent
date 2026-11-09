@@ -58,7 +58,7 @@ def send_email_job(app, task_id):
                 server.send_message(msg)
 
             task.status = 'Sent'
-            task.actual_send_time = datetime.utcnow()
+            task.actual_send_time = datetime.now()
             task.error_message = None
             db.session.commit()
             app.logger.info(f"Task {task_id} sent successfully.")
