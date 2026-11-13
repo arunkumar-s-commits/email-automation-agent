@@ -19,3 +19,4 @@ def post_fork(server, worker):
         server.log.info("Email scheduler initialized in worker %s", worker.pid)
     except Exception as e:
         server.log.error("Failed to initialize scheduler in worker %s: %s", worker.pid, e)
+

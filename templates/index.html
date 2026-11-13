@@ -127,7 +127,8 @@
             <section class="data-table-section glass-panel" id="logs">
                 <div class="panel-header flex-between">
                     <h2><i class="fas fa-table"></i> Email Queue</h2>
-                    <div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <button id="btn-retry-failed" class="btn btn-warning" title="Retry all failed emails"><i class="fas fa-redo-alt"></i> Retry Failed</button>
                         <button id="btn-delete-all" class="btn btn-danger"><i class="fas fa-trash-alt"></i> Delete All</button>
                         <button id="btn-refresh" class="btn btn-icon"><i class="fas fa-sync-alt"></i></button>
                     </div>

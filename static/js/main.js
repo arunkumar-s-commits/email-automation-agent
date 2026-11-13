@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnUploadExcel = document.getElementById('btn-upload-excel');
     const excelFileInput = document.getElementById('excel-file-input');
     const btnDeleteAll = document.getElementById('btn-delete-all');
+    const btnRetryFailed = document.getElementById('btn-retry-failed');
 
     // Drag and Drop Zone elements
     const dropZone = document.getElementById('drop-zone');
@@ -164,6 +165,30 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (e) {
                 console.error('Delete all error', e);
                 showToast('Failed to delete all tasks', 'danger');
+            }
+        });
+    }
+
+    if (btnRetryFailed) {
+        btnRetryFailed.addEventListener('click', async () => {
+            try {
+                btnRetryFailed.disabled = true;
+                btnRetryFailed.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Retrying...';
+                const res = await fetch('/api/tasks/retry-failed', { method: 'POST' });
+                const data = await res.json();
+                if (res.ok) {
+                    showToast(data.message || 'Rescheduled failed emails for retry', 'success');
+                    fetchTasks();
+                    fetchStats();
+                } else {
+                    showToast(data.error || 'Failed to retry emails', 'danger');
+                }
+            } catch (e) {
+                console.error('Retry all error', e);
+                showToast('Error retrying failed emails', 'danger');
+            } finally {
+                btnRetryFailed.disabled = false;
+                btnRetryFailed.innerHTML = '<i class="fas fa-redo-alt"></i> Retry Failed';
             }
         });
     }
@@ -535,6 +560,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     case 'failed': statusClass = 'status-failed'; break;
                 }
 
+                let statusBadgeText = task.status;
+                if (task.status === 'Failed' && task.retry_count && task.retry_count > 0) {
+                    statusBadgeText = task.retry_count >= 3 ? 'Failed (Max Retries)' : `Failed (Retry ${task.retry_count}/3)`;
+                } else if (task.status === 'Sending' && task.retry_count && task.retry_count > 0) {
+                    statusBadgeText = `Retrying (${task.retry_count}/3)`;
+                }
+
                 let actionsHTML = `
                     <button class="btn-icon" onclick="deleteTask(${task.id})" title="Delete"><i class="fas fa-trash"></i></button>
                 `;
@@ -554,7 +586,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td>${task.subject}</td>
                     <td>${sentDate}</td>
                     <td>
-                        <span class="status-badge ${statusClass}">${task.status}</span>
+                        <span class="status-badge ${statusClass}">${statusBadgeText}</span>
                         ${errorHTML}
                     </td>
                     <td>${actionsHTML}</td>

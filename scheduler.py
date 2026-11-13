@@ -10,16 +10,16 @@ scheduler = BackgroundScheduler()
 def process_email_queue(app):
     """
     Continuous background worker job.
-    Every few seconds, checks the database for any scheduled email tasks
-    whose scheduled_time has arrived and sends them.
-    Ensures that tasks are never left stuck in 'Scheduled' even if the server
-    restarted or worker processes forked.
+    1. First processes all Scheduled emails whose scheduled_time has arrived.
+    2. Once ALL scheduled emails have completed sending:
+       Checks for any failed emails (status == 'Failed' and retry_count < MAX_RETRIES)
+       and automatically retries sending them continuously until completion.
     """
     with app.app_context():
         from models import db, EmailTask
         now = datetime.now()
 
-        # Recover any tasks stuck in 'Sending' for more than 5 minutes (e.g. from an ungraceful server crash)
+        # Step 1: Recover any tasks stuck in 'Sending' for more than 5 minutes (ungraceful crash)
         stuck_tasks = EmailTask.query.filter(
             EmailTask.status == 'Sending',
             EmailTask.scheduled_time <= now - timedelta(minutes=5)
@@ -29,7 +29,7 @@ def process_email_queue(app):
         if stuck_tasks:
             db.session.commit()
 
-        # Pick the oldest due task that is ready to send
+        # Step 2: Pick the oldest due 'Scheduled' task
         due_task = EmailTask.query.filter(
             EmailTask.status == 'Scheduled',
             EmailTask.scheduled_time <= now
@@ -37,6 +37,35 @@ def process_email_queue(app):
 
         if due_task:
             send_email_job(app, due_task.id)
+            return
+
+        # Step 3: Check if there are other regular tasks still scheduled for the future
+        has_future_scheduled = EmailTask.query.filter(
+            EmailTask.status.in_(['Scheduled', 'Sending'])
+        ).first()
+
+        if has_future_scheduled:
+            # Main scheduled batch still in progress; wait for it to complete
+            return
+
+        # Step 4: All regular scheduled emails have finished!
+        # Automatically check for failed emails and continuously retry them
+        MAX_RETRIES = 3
+        failed_task = EmailTask.query.filter(
+            EmailTask.status == 'Failed',
+            EmailTask.retry_count < MAX_RETRIES
+        ).order_by(EmailTask.id.asc()).first()
+
+        if failed_task:
+            failed_task.retry_count = (failed_task.retry_count or 0) + 1
+            app.logger.info(
+                f"[Auto-Retry] Retrying failed email #{failed_task.id} to {failed_task.email_address} "
+                f"(Attempt {failed_task.retry_count}/{MAX_RETRIES})"
+            )
+            # Temporarily mark Scheduled and dispatch immediately
+            failed_task.status = 'Scheduled'
+            db.session.commit()
+            send_email_job(app, failed_task.id)
 
 def init_scheduler(app):
     """
@@ -90,6 +119,7 @@ def send_email_job(app, task_id):
 
         if not smtp_user or not smtp_password:
             task.status = 'Failed'
+            task.retry_count = 3  # Avoid infinite retries if credentials aren't set
             task.error_message = 'SMTP credentials not configured. Please set SMTP_USER and SMTP_PASSWORD in Environment Variables.'
             db.session.commit()
             app.logger.error(f"Task {task_id} failed: SMTP credentials not configured.")
@@ -122,7 +152,11 @@ def send_email_job(app, task_id):
 
         except Exception as e:
             task.status = 'Failed'
-            task.error_message = str(e)
+            attempt = task.retry_count or 0
+            if attempt > 0:
+                task.error_message = f"Attempt {attempt}/3 failed: {str(e)}"
+            else:
+                task.error_message = str(e)
             db.session.commit()
             app.logger.error(f"Task {task_id} failed to send: {str(e)}")
 

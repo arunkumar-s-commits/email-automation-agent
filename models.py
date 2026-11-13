@@ -14,6 +14,7 @@ class EmailTask(db.Model):
     actual_send_time = db.Column(db.DateTime, nullable=True)
     status = db.Column(db.String(50), nullable=False, default='Pending') # Pending, Scheduled, Sending, Sent, Failed
     error_message = db.Column(db.Text, nullable=True)
+    retry_count = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
@@ -26,5 +27,6 @@ class EmailTask(db.Model):
             'actual_send_time': self.actual_send_time.strftime('%Y-%m-%d %H:%M:%S') if self.actual_send_time else None,
             'status': self.status,
             'error_message': self.error_message,
+            'retry_count': getattr(self, 'retry_count', 0) or 0,
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else None
         }

@@ -18,6 +18,13 @@ db.init_app(app)
 # Initialize database and scheduler on first request
 with app.app_context():
     db.create_all()
+    # Migration safeguard: ensure retry_count column exists
+    try:
+        from sqlalchemy import text
+        db.session.execute(text("ALTER TABLE email_tasks ADD COLUMN retry_count INTEGER DEFAULT 0"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
     init_scheduler(app)
 
 @app.before_request
@@ -196,25 +203,42 @@ def delete_task(task_id):
 @app.route('/api/tasks/retry/<int:task_id>', methods=['POST'])
 def retry_task(task_id):
     try:
-        task = EmailTask.query.get(task_id)
+        task = db.session.get(EmailTask, task_id)
         if not task:
             return jsonify({'error': 'Task not found'}), 404
             
+        data = request.get_json(silent=True) or {}
+        new_time_str = data.get('new_time')
+        
+        task.retry_count = 0  # Reset retry counter on manual retry
+        if new_time_str:
+            task.scheduled_time = pd.to_datetime(new_time_str).to_pydatetime()
+            task.status = 'Scheduled'
+        else:
+            task.scheduled_time = datetime.now()
+            task.status = 'Scheduled'
             
-        if task.status == 'Failed':
-            data = request.get_json(silent=True) or {}
-            new_time_str = data.get('new_time')
-            
-            if new_time_str:
-                task.scheduled_time = pd.to_datetime(new_time_str).to_pydatetime()
-                task.status = 'Scheduled'
-                schedule_email(app, task) # Add it to APScheduler immediately if a new time is given
-            else:
-                task.status = 'Pending'
-                
-            task.error_message = None
-            db.session.commit()
-        return jsonify({'message': 'Task marked for retry'})
+        task.error_message = None
+        db.session.commit()
+        schedule_email(app, task)
+        return jsonify({'message': 'Task rescheduled for retry'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tasks/retry-failed', methods=['POST'])
+def retry_all_failed():
+    try:
+        from datetime import datetime
+        failed_tasks = EmailTask.query.filter_by(status='Failed').all()
+        for t in failed_tasks:
+            t.status = 'Scheduled'
+            t.retry_count = 0
+            t.scheduled_time = datetime.now()
+            t.error_message = None
+        db.session.commit()
+        init_scheduler(app)
+        return jsonify({'message': f'Rescheduled {len(failed_tasks)} failed emails for retry'})
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
