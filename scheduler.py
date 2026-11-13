@@ -112,6 +112,81 @@ def send_email_job(app, task_id):
         task.status = 'Sending'
         db.session.commit()
 
+        # Check for HTTP-based Email APIs (HTTPS port 443 - never blocked by cloud firewalls like Render Free Tier)
+        resend_api_key = os.environ.get('RESEND_API_KEY')
+        brevo_api_key = os.environ.get('BREVO_API_KEY')
+
+        if resend_api_key:
+            try:
+                import json, urllib.request
+                app.logger.info(f"Sending task {task_id} via Resend HTTP API")
+                sender = os.environ.get('SMTP_USER') or os.environ.get('RESEND_FROM') or 'onboarding@resend.dev'
+                payload = {
+                    "from": sender,
+                    "to": [task.email_address],
+                    "subject": task.subject,
+                    "text": task.message_content
+                }
+                req = urllib.request.Request(
+                    "https://api.resend.com/emails",
+                    data=json.dumps(payload).encode('utf-8'),
+                    headers={
+                        "Authorization": f"Bearer {resend_api_key}",
+                        "Content-Type": "application/json",
+                        "User-Agent": "EmailAutomationAgent/1.0"
+                    }
+                )
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    pass
+                task.status = 'Sent'
+                task.actual_send_time = datetime.now()
+                task.error_message = None
+                db.session.commit()
+                app.logger.info(f"Task {task_id} sent successfully via Resend.")
+                return
+            except Exception as e:
+                task.status = 'Failed'
+                task.error_message = f"Resend API error: {str(e)}"
+                db.session.commit()
+                app.logger.error(f"Task {task_id} failed via Resend: {str(e)}")
+                return
+
+        if brevo_api_key:
+            try:
+                import json, urllib.request
+                app.logger.info(f"Sending task {task_id} via Brevo HTTP API")
+                sender_email = os.environ.get('SMTP_USER') or 'noreply@yourdomain.com'
+                payload = {
+                    "sender": {"email": sender_email, "name": "Email Automation"},
+                    "to": [{"email": task.email_address}],
+                    "subject": task.subject,
+                    "textContent": task.message_content
+                }
+                req = urllib.request.Request(
+                    "https://api.brevo.com/v3/smtp/email",
+                    data=json.dumps(payload).encode('utf-8'),
+                    headers={
+                        "api-key": brevo_api_key,
+                        "Content-Type": "application/json",
+                        "User-Agent": "EmailAutomationAgent/1.0"
+                    }
+                )
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    pass
+                task.status = 'Sent'
+                task.actual_send_time = datetime.now()
+                task.error_message = None
+                db.session.commit()
+                app.logger.info(f"Task {task_id} sent successfully via Brevo.")
+                return
+            except Exception as e:
+                task.status = 'Failed'
+                task.error_message = f"Brevo API error: {str(e)}"
+                db.session.commit()
+                app.logger.error(f"Task {task_id} failed via Brevo: {str(e)}")
+                return
+
+        # Fallback to standard SMTP
         smtp_server = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
         smtp_port = int(os.environ.get('SMTP_PORT', 587))
         smtp_user = os.environ.get('SMTP_USER')
@@ -152,11 +227,19 @@ def send_email_job(app, task_id):
 
         except Exception as e:
             task.status = 'Failed'
+            raw_err = str(e)
+            if "Network is unreachable" in raw_err or "101" in raw_err:
+                friendly_err = "Render Free Tier blocks outbound SMTP ports 587/465. Run locally or use an HTTP API (e.g. Resend/Brevo)."
+            elif "timed out" in raw_err.lower() or "110" in raw_err:
+                friendly_err = "Connection timed out on SMTP port. Render Free Tier blocks direct SMTP connections."
+            else:
+                friendly_err = raw_err
+
             attempt = task.retry_count or 0
             if attempt > 0:
-                task.error_message = f"Attempt {attempt}/3 failed: {str(e)}"
+                task.error_message = f"Attempt {attempt}/3 failed: {friendly_err}"
             else:
-                task.error_message = str(e)
+                task.error_message = friendly_err
             db.session.commit()
             app.logger.error(f"Task {task_id} failed to send: {str(e)}")
 
