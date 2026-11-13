@@ -20,6 +20,11 @@ with app.app_context():
     db.create_all()
     init_scheduler(app)
 
+@app.before_request
+def ensure_scheduler():
+    if not scheduler.running:
+        init_scheduler(app)
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -140,14 +145,20 @@ def control_scheduler():
     try:
         if action == 'start':
             if not scheduler.running:
-                scheduler.start()
+                init_scheduler(app)
+            elif scheduler.state == 2:  # Paused
+                scheduler.resume()
         elif action == 'stop':
             if scheduler.running:
-                scheduler.shutdown(wait=False)
+                scheduler.pause()
         elif action == 'pause':
-            scheduler.pause()
+            if scheduler.running:
+                scheduler.pause()
         elif action == 'resume':
-            scheduler.resume()
+            if not scheduler.running:
+                init_scheduler(app)
+            else:
+                scheduler.resume()
         else:
             return jsonify({'error': 'Invalid action'}), 400
             
