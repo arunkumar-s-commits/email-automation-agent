@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EAuto - Email Automation Scheduler</title>
     <!-- Custom CSS -->
-    <link href="{{ url_for('static', filename='css/styles.css') }}?v=1" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/styles.css') }}?v=2" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -90,12 +90,31 @@
                     <p>Enter data or copy-paste from Excel. Format: Email [Tab] Subject [Tab] Message</p>
                 </div>
                 
+                <!-- Drag and Drop File Upload Area -->
+                <div id="drop-zone" class="drop-zone">
+                    <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" style="display: none;">
+                    <div id="drop-zone-content" class="drop-zone-content">
+                        <div class="drop-zone-icon-wrap">
+                            <i class="fas fa-cloud-arrow-up"></i>
+                        </div>
+                        <div class="drop-zone-text">
+                            <p class="drop-zone-title">Drag & drop your Excel or CSV file here, or <span class="drop-zone-browse">browse</span></p>
+                            <p class="drop-zone-hint">Supports <strong>.xlsx</strong>, <strong>.xls</strong>, and <strong>.csv</strong></p>
+                        </div>
+                    </div>
+                    <div id="drop-zone-file-info" class="drop-zone-file-info" style="display: none;">
+                        <i class="fas fa-file-excel file-icon"></i>
+                        <span id="drop-zone-file-name" class="file-name"></span>
+                        <span id="drop-zone-file-size" class="file-size"></span>
+                        <button type="button" id="btn-remove-dropped-file" class="btn-remove-file" title="Clear file"><i class="fas fa-times"></i></button>
+                    </div>
+                </div>
+
                 <div class="input-area">
                     <div id="spreadsheet"></div>
                 </div>
                 
                 <div class="actions">
-                    <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" style="display: none;">
                     <button id="btn-upload-excel" class="btn btn-primary"><i class="fas fa-file-upload"></i> Upload Excel / CSV</button>
                     <button id="btn-save" class="btn btn-secondary"><i class="fas fa-save"></i> Save Draft</button>
                     <button id="btn-execute" class="btn btn-success"><i class="fas fa-paper-plane"></i> Execute Scheduler</button>

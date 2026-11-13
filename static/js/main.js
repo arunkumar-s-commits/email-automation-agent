@@ -14,6 +14,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const excelFileInput = document.getElementById('excel-file-input');
     const btnDeleteAll = document.getElementById('btn-delete-all');
 
+    // Drag and Drop Zone elements
+    const dropZone = document.getElementById('drop-zone');
+    const dropZoneContent = document.getElementById('drop-zone-content');
+    const dropZoneFileInfo = document.getElementById('drop-zone-file-info');
+    const dropZoneFileName = document.getElementById('drop-zone-file-name');
+    const dropZoneFileSize = document.getElementById('drop-zone-file-size');
+    const btnRemoveDroppedFile = document.getElementById('btn-remove-dropped-file');
+
     // Modal elements
     const retryModal = document.getElementById('retry-modal');
     const closeBtn = document.querySelector('.close-modal');
@@ -132,6 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     btnClear.addEventListener('click', () => {
         spreadsheet.setData([['', '', '']]);
+        resetDropZone();
     });
 
     btnAddRow.addEventListener('click', () => {
@@ -202,15 +211,51 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    excelFileInput.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
+    // Drop Zone Utilities
+    const formatBytes = (bytes) => {
+        if (!bytes || bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    };
+
+    const showDroppedFileInfo = (file, rowCount) => {
+        if (!dropZoneFileInfo || !dropZoneContent) return;
+        if (dropZoneFileName) dropZoneFileName.textContent = file.name;
+        if (dropZoneFileSize) dropZoneFileSize.textContent = `${formatBytes(file.size)} (${rowCount} contact${rowCount > 1 ? 's' : ''})`;
+        dropZoneContent.style.display = 'none';
+        dropZoneFileInfo.style.display = 'flex';
+    };
+
+    const resetDropZone = () => {
+        if (!dropZoneFileInfo || !dropZoneContent) return;
+        dropZoneContent.style.display = 'flex';
+        dropZoneFileInfo.style.display = 'none';
+        if (dropZoneFileName) dropZoneFileName.textContent = '';
+        if (dropZoneFileSize) dropZoneFileSize.textContent = '';
+        if (excelFileInput) excelFileInput.value = '';
+    };
+
+    const uploadFile = async (file) => {
         if (!file) return;
+
+        const validExtensions = ['.csv', '.xlsx', '.xls'];
+        const fileName = file.name.toLowerCase();
+        const isValid = validExtensions.some(ext => fileName.endsWith(ext));
+
+        if (!isValid) {
+            showToast('Unsupported file type. Please upload a .xlsx, .xls, or .csv file.', 'warning');
+            return;
+        }
 
         const formData = new FormData();
         formData.append('file', file);
 
         try {
-            showToast('Importing file securely...', 'info');
+            if (dropZone) dropZone.classList.add('uploading');
+            showToast(`Importing ${file.name}...`, 'info');
+
             const response = await fetch('/api/import', {
                 method: 'POST',
                 body: formData
@@ -218,7 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             
             if (response.ok) {
-                let parsedData = data.records;
+                let parsedData = data.records || [];
                 
                 if (parsedData.length > 0) {
                     // Check if the first row looks like a header and remove it
@@ -235,18 +280,99 @@ document.addEventListener('DOMContentLoaded', () => {
                         row[1] ? row[1].toString().trim() : '',
                         row[2] ? row[2].toString().trim() : ''
                     ];
-                });
+                }).filter(row => row[0] || row[1] || row[2]);
                 
-                spreadsheet.setData(mappedData);
-                showToast('File imported successfully!', 'success');
+                if (mappedData.length === 0) {
+                    showToast('No valid data rows found in file.', 'warning');
+                    resetDropZone();
+                } else {
+                    spreadsheet.setData(mappedData);
+                    showToast(`Successfully imported ${mappedData.length} contact${mappedData.length > 1 ? 's' : ''} from ${file.name}!`, 'success');
+                    showDroppedFileInfo(file, mappedData.length);
+                }
             } else {
                 showToast(data.error || 'Failed to import file', 'danger');
+                resetDropZone();
             }
         } catch (error) {
+            console.error('File import error:', error);
             showToast('Error importing file', 'danger');
+            resetDropZone();
+        } finally {
+            if (dropZone) dropZone.classList.remove('uploading');
+            if (excelFileInput) excelFileInput.value = '';
         }
-        excelFileInput.value = ''; // Reset input
+    };
+
+    excelFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            uploadFile(file);
+        }
     });
+
+    if (btnRemoveDroppedFile) {
+        btnRemoveDroppedFile.addEventListener('click', (e) => {
+            e.stopPropagation();
+            resetDropZone();
+            spreadsheet.setData([['', '', '']]);
+            showToast('Imported file cleared', 'info');
+        });
+    }
+
+    // Drag and Drop Event Handlers
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        window.addEventListener(eventName, (e) => {
+            e.preventDefault();
+        }, false);
+    });
+
+    if (dropZone) {
+        let dragCounter = 0;
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            }, false);
+        });
+
+        dropZone.addEventListener('dragenter', (e) => {
+            dragCounter++;
+            dropZone.classList.add('drag-over');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            dragCounter--;
+            if (dragCounter <= 0) {
+                dragCounter = 0;
+                dropZone.classList.remove('drag-over');
+            }
+        });
+
+        dropZone.addEventListener('dragover', (e) => {
+            if (!dropZone.classList.contains('drag-over')) {
+                dropZone.classList.add('drag-over');
+            }
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dragCounter = 0;
+            dropZone.classList.remove('drag-over');
+
+            const dt = e.dataTransfer;
+            if (dt && dt.files && dt.files.length > 0) {
+                uploadFile(dt.files[0]);
+            }
+        });
+
+        dropZone.addEventListener('click', (e) => {
+            if (e.target.closest('#btn-remove-dropped-file')) return;
+            excelFileInput.click();
+        });
+    }
 
     const getCleanData = () => {
         const data = spreadsheet.getData();
@@ -293,6 +419,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (res.ok) {
                 spreadsheet.setData([['', '', '']]);
+                resetDropZone();
                 showToast(`Successfully saved draft for ${records.length} emails.`, 'success');
                 fetchTasks();
                 fetchStats();
@@ -328,6 +455,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (res.ok) {
                 spreadsheet.setData([['', '', '']]);
+                resetDropZone();
                 showToast(`Successfully scheduled ${records.length} emails.`, 'success');
                 fetchTasks();
                 fetchStats();

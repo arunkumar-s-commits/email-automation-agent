@@ -294,6 +294,149 @@ header {
     align-items: center;
 }
 
+/* Drop Zone */
+.drop-zone {
+    border: 2px dashed rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.25rem;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    position: relative;
+    user-select: none;
+}
+
+.drop-zone:hover {
+    border-color: var(--primary);
+    background: rgba(59, 130, 246, 0.06);
+}
+
+.drop-zone.drag-over {
+    border-color: var(--primary);
+    background: rgba(59, 130, 246, 0.12);
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+    transform: scale(1.008);
+}
+
+.drop-zone.uploading {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.drop-zone-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.25rem;
+}
+
+.drop-zone-icon-wrap {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: rgba(59, 130, 246, 0.15);
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    transition: transform 0.25s ease, background 0.25s ease, color 0.25s ease;
+    flex-shrink: 0;
+}
+
+.drop-zone:hover .drop-zone-icon-wrap,
+.drop-zone.drag-over .drop-zone-icon-wrap {
+    transform: translateY(-2px) scale(1.08);
+    background: var(--primary);
+    color: #ffffff;
+}
+
+.drop-zone-text {
+    text-align: left;
+}
+
+.drop-zone-title {
+    font-size: 0.98rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 0.2rem;
+}
+
+.drop-zone-browse {
+    color: var(--primary);
+    text-decoration: underline;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.drop-zone-hint {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+}
+
+.drop-zone-file-info {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    padding: 0.5rem 1.2rem;
+    border-radius: 8px;
+    color: var(--text-primary);
+}
+
+.drop-zone-file-info .file-icon {
+    font-size: 1.3rem;
+    color: var(--success);
+}
+
+.drop-zone-file-info .file-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.drop-zone-file-info .file-size {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+}
+
+.btn-remove-file {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    cursor: pointer;
+    padding: 3px 6px;
+    border-radius: 4px;
+    margin-left: 0.5rem;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-remove-file:hover {
+    color: var(--danger);
+    background: rgba(239, 68, 68, 0.15);
+}
+
+@media (max-width: 600px) {
+    .drop-zone-content {
+        flex-direction: column;
+        gap: 0.75rem;
+        text-align: center;
+    }
+    .drop-zone-text {
+        text-align: center;
+    }
+}
+
 /* Data Entry */
 .input-area {
     width: 100%;
